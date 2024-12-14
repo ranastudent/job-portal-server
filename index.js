@@ -35,16 +35,16 @@ async function run() {
             console.log("Pinged your deployment. You successfully connected to MongoDB!");
 
 
-           
+
             const jobsCollection = client.db('job-Portal').collection('jobs')
             const jobsApplicationCollection = client.db('job-Portal').collection('job_application')
-             // jobs related api
+            // jobs related api
 
             app.get('/jobs', async (req, res) => {
                   const email = req.query.email
                   let query = {}
                   if (email) {
-                       query = {hr_email : email} 
+                        query = { hr_email: email }
                   }
                   const cursor = jobsCollection.find(query);
                   const result = await cursor.toArray()
@@ -56,7 +56,7 @@ async function run() {
                   const result = await jobsCollection.findOne(query)
                   res.send(result)
             })
-            app.post('/jobs', async(req, res)=>{
+            app.post('/jobs', async (req, res) => {
                   const newJob = req.body
                   const result = await jobsCollection.insertOne(newJob)
                   res.send(result)
@@ -65,30 +65,55 @@ async function run() {
 
             // job application apis
 
-            app.get('/jobs-application', async (req, res)=>{
+            app.get('/jobs-application', async (req, res) => {
                   const email = req.query.email;
-            const query = { applicant_email: email }
-            const result = await jobsApplicationCollection.find(query).toArray();
-            //fokira way to aggrigate
-            for(const application of result){
-                  console.log(application.job_id)
-                  const query1 = {_id : new ObjectId(application.job_id)}
-                  const job = await jobsCollection.findOne(query1)
-                  if (job) {
-                      application.title = job.title
-                      application.company = job.company
-                      application.company_logo = job.company_logo
-                      application.location = job.location  
+                  const query = { applicant_email: email }
+                  const result = await jobsApplicationCollection.find(query).toArray();
+                  //fokira way to aggrigate
+                  for (const application of result) {
+                        console.log(application.job_id)
+                        const query1 = { _id: new ObjectId(application.job_id) }
+                        const job = await jobsCollection.findOne(query1)
+                        if (job) {
+                              application.title = job.title
+                              application.company = job.company
+                              application.company_logo = job.company_logo
+                              application.location = job.location
+                        }
                   }
-            }
-            res.send(result)
+                  res.send(result)
             })
 
-            app.post('/jobs-application', async(req, res)=>{
-                  const application = req.body
-                  const result = await jobsApplicationCollection.insertOne(application)
-                  res.send(result)
-                })
+            app.post('/job-application', async (req, res) => {
+                  const application = req.body;
+                  const result = await jobsApplicationCollection.insertOne(application);
+      
+                  // Not the best way (use aggregate) 
+                  // skip --> it
+                  const id = application.job_id;
+                  const query = { _id: new ObjectId(id) }
+                  const job = await jobsCollection.findOne(query);
+                  let newCount = 0;
+                  if (job.applicationCount) {
+                      newCount = job.applicationCount + 1;
+                  }
+                  else {
+                      newCount = 1;
+                  }
+      
+                  // now update the job info
+                  const filter = { _id: new ObjectId(id) };
+                  const updatedDoc = {
+                      $set: {
+                          applicationCount: newCount
+                      }
+                  }
+      
+                  const updateResult = await jobsCollection.updateOne(filter, updatedDoc);
+      
+                  res.send(result);
+              });
+                
 
 
 
