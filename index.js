@@ -35,12 +35,18 @@ async function run() {
             console.log("Pinged your deployment. You successfully connected to MongoDB!");
 
 
-            // jobs related api
+           
             const jobsCollection = client.db('job-Portal').collection('jobs')
             const jobsApplicationCollection = client.db('job-Portal').collection('job_application')
+             // jobs related api
 
             app.get('/jobs', async (req, res) => {
-                  const cursor = jobsCollection.find();
+                  const email = req.query.email
+                  let query = {}
+                  if (email) {
+                       query = {hr_email : email} 
+                  }
+                  const cursor = jobsCollection.find(query);
                   const result = await cursor.toArray()
                   res.send(result)
             });
@@ -50,6 +56,12 @@ async function run() {
                   const result = await jobsCollection.findOne(query)
                   res.send(result)
             })
+            app.post('/jobs', async(req, res)=>{
+                  const newJob = req.body
+                  const result = await jobsCollection.insertOne(newJob)
+                  res.send(result)
+                  console.log(newJob)
+            })
 
             // job application apis
 
@@ -57,8 +69,21 @@ async function run() {
                   const email = req.query.email;
             const query = { applicant_email: email }
             const result = await jobsApplicationCollection.find(query).toArray();
+            //fokira way to aggrigate
+            for(const application of result){
+                  console.log(application.job_id)
+                  const query1 = {_id : new ObjectId(application.job_id)}
+                  const job = await jobsCollection.findOne(query1)
+                  if (job) {
+                      application.title = job.title
+                      application.company = job.company
+                      application.company_logo = job.company_logo
+                      application.location = job.location  
+                  }
+            }
             res.send(result)
             })
+
             app.post('/jobs-application', async(req, res)=>{
                   const application = req.body
                   const result = await jobsApplicationCollection.insertOne(application)
